@@ -11,9 +11,24 @@
 #
 
 
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.5)
 project(zmqpp)
 enable_testing()
+
+
+
+find_package(zeromq CONFIG REQUIRED)
+message("Inc dir = ${ZeroMQ_INCLUDE_DIR}")
+
+if(NOT ZeroMQ_FOUND)
+    # Find zmq.h and add its dir to the includes
+    find_path(ZEROMQ_INCLUDE zmq.h PATHS ${ZEROMQ_INCLUDE_DIR})
+    include_directories(${ZEROMQ_INCLUDE_DIR} ${ZEROMQ_INCLUDE} ${CMAKE_CURRENT_SOURCE_DIR}/src )
+endif()
+
+# Paths to set to look for zmq
+set( ZEROMQ_LIB_DIR       ""      CACHE PATH "The library directory for libzmq" )
+set( ZEROMQ_INCLUDE_DIR   ""      CACHE PATH "The include directory for ZMQ" )
 
 # prepare C++11
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
@@ -36,11 +51,6 @@ if(NOT DEFINED CMAKE_MACOSX_RPATH)
   set(CMAKE_MACOSX_RPATH 0)
 endif()
 
-# If libzmq is build in the same cmake global project and we want to
-# depends on it instead of searching for libzmq in the system, we set this to true
-set( ZMQPP_LIBZMQ_CMAKE   false   CACHE BOOL "libzmq is build through cmake too" )
-
-
 set( ZMQPP_BUILD_STATIC   true   CACHE BOOL "Build the ZMQPP static library" )
 set( ZMQPP_BUILD_SHARED   true   CACHE BOOL "Build the ZMQPP dynamic library" )
 
@@ -56,16 +66,10 @@ set( ZMQPP_BUILD_TESTS    false   CACHE BOOL "Build the ZMQPP tests" )
 set( ZMQPP_LIBZMQ_NAME_STATIC  "zmq-static" CACHE STRING "The ZMQ library to link the static ZMQPP. (if built)" )
 set( ZMQPP_LIBZMQ_NAME_SHARED  "zmq"        CACHE STRING "The ZMQ library to link the dynamic ZMQPP. (if built)" )
 
-# Paths to set to look for zmq
-set( ZEROMQ_LIB_DIR       ""      CACHE PATH "The library directory for libzmq" )
-set( ZEROMQ_INCLUDE_DIR   ""      CACHE PATH "The include directory for ZMQ" )
 
 # Build flags
 set( IS_TRAVIS_CI_BUILD   true    CACHE BOOL "Defines TRAVIS_CI_BUILD - Should the tests avoid running cases where memory is scarce." )
 
-# Find zmq.h and add its dir to the includes
-find_path(ZEROMQ_INCLUDE zmq.h PATHS ${ZEROMQ_INCLUDE_DIR})
-include_directories(${ZEROMQ_INCLUDE_DIR} ${ZEROMQ_INCLUDE} ${CMAKE_CURRENT_SOURCE_DIR}/src )
 
 # Do not run some tests when building on travis-ci (this cause oom error and kill the test
 # process)
@@ -109,18 +113,8 @@ set( LIBZMQPP_SOURCES
 if (ZMQPP_BUILD_STATIC)
   add_library( zmqpp-static STATIC ${LIBZMQPP_SOURCES})
   target_compile_definitions(zmqpp-static PUBLIC ZMQ_STATIC ZMQPP_STATIC_DEFINE)
-  if (NOT ZMQPP_LIBZMQ_CMAKE)
-    find_library(ZEROMQ_LIBRARY_STATIC ${ZMQPP_LIBZMQ_NAME_STATIC} PATHS ${ZEROMQ_LIB_DIR})
-    if (NOT ZEROMQ_LIBRARY_STATIC)
-      # If libzmq was not installed through CMake, the static binary is libzmq.a not libzmq-static.a
-      find_library(ZEROMQ_LIBRARY_STATIC libzmq.a PATHS ${ZEROMQ_LIB_DIR})
-    endif()
-    target_link_libraries( zmqpp-static ${ZEROMQ_LIBRARY_STATIC})
-  else()
-    # libzmq-static is the name of the target from
-    # libzmq's CMake
-    target_link_libraries(zmqpp-static libzmq-static)
-  endif()
+  target_link_libraries( zmqpp-static libzmq-static)
+
   list( APPEND INSTALL_TARGET_LIST zmqpp-static)
   set( LIB_TO_LINK_TO_EXAMPLES zmqpp-static )
 endif() # ZMQPP_BUILD_STATIC
@@ -128,14 +122,7 @@ endif() # ZMQPP_BUILD_STATIC
 # Shared lib
 if (ZMQPP_BUILD_SHARED)
   add_library( zmqpp SHARED ${LIBZMQPP_SOURCES})
-  if (NOT ZMQPP_LIBZMQ_CMAKE)
-    find_library(ZEROMQ_LIBRARY_SHARED ${ZMQPP_LIBZMQ_NAME_SHARED} PATHS ${ZEROMQ_LIB_DIR})
-    target_link_libraries( zmqpp ${ZEROMQ_LIBRARY_SHARED} )
-  else()
-    # libzmq is the name of the target from
-    # libzmq's CMake
-    target_link_libraries(zmqpp libzmq)
-  endif()
+  target_link_libraries(zmqpp libzmq)
   list( APPEND INSTALL_TARGET_LIST zmqpp)
   set( LIB_TO_LINK_TO_EXAMPLES zmqpp )
 endif() # ZMQPP_BUILD_SHARED
